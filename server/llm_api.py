@@ -4,16 +4,21 @@ import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from configs.model_config import llm_model_dict, LLM_MODEL, LLM_DEVICE, LOG_PATH, logger
+from configs.model_config import llm_model_dict, LLM_MODEL, LLM_DEVICE, LOG_PATH, logger, SYSTEM_PROMPT
+from configs.server_config import DEFAULT_BIND_HOST, LOCAL_HOST, FSCHAT_MODEL_WORKERS, FSCHAT_CONTROLLER, FSCHAT_OPENAI_API
 from server.utils import MakeFastAPIOffline
 
 
-host_ip = "0.0.0.0"
-controller_port = 20001
-model_worker_port = 20002
-openai_api_port = 8888
-base_url = "http://127.0.0.1:{}"
+host_ip = DEFAULT_BIND_HOST
+controller_port = FSCHAT_CONTROLLER["port"]
+model_worker_port = FSCHAT_MODEL_WORKERS[LLM_MODEL]["port"]
+openai_api_port = FSCHAT_OPENAI_API["port"]
+base_url = "http://" + LOCAL_HOST + ":{}"
 
+#ser gpu info for llm model
+gpu_ids = FSCHAT_MODEL_WORKERS[LLM_MODEL]["gpus"]
+gpu_num = FSCHAT_MODEL_WORKERS[LLM_MODEL]["num_gpus"]
+gpu_max_memory = FSCHAT_MODEL_WORKERS[LLM_MODEL]["max_gpu_memory"]
 
 def set_httpx_timeout(timeout=60.0):
     import httpx
@@ -42,8 +47,9 @@ def create_model_worker_app(
         controller_address=base_url.format(controller_port),
         model_path=llm_model_dict[LLM_MODEL].get("local_model_path"),
         device=LLM_DEVICE,
-        gpus=None,
-        max_gpu_memory="20GiB",
+        gpus=gpu_ids,
+        num_gpus=gpu_num,  # not in fastchat
+        max_gpu_memory=gpu_max_memory,
         load_8bit=False,
         cpu_offloading=None,
         gptq_ckpt=None,
@@ -54,7 +60,6 @@ def create_model_worker_app(
         awq_wbits=16,
         awq_groupsize=-1,
         model_names=[LLM_MODEL],
-        num_gpus=1, # not in fastchat
         conv_template=None,
         limit_worker_concurrency=5,
         stream_interval=2,
@@ -143,6 +148,8 @@ def create_model_worker_app(
         stream_interval=args.stream_interval,
         conv_template=args.conv_template,
     )
+
+    worker.conv.set_system_message(SYSTEM_PROMPT)
 
     sys.modules["fastchat.serve.model_worker"].worker = worker
     sys.modules["fastchat.serve.model_worker"].args = args
