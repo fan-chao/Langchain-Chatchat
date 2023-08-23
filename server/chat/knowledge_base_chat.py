@@ -58,7 +58,7 @@ def knowledge_base_chat(query: str = Body(..., description="用户输入", examp
         context = "\n".join([doc.page_content for doc in docs])
 
         chat_prompt = ChatPromptTemplate.from_messages(
-            [i.to_msg_tuple() for i in history] + [("human", PROMPT_TEMPLATE)])
+            [i.to_msg_tuple() for i in history[:-1]] + [("human", PROMPT_TEMPLATE)])
 
         chain = LLMChain(prompt=chat_prompt, llm=model)
 
